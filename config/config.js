@@ -44,11 +44,14 @@ const CONFIG = {
   LOG_DIR: path.join(parentDir, 'logs'),
   LOG_LEVEL: process.env.STEAM_ID_PROCESSOR_LOG_LEVEL || 'info', // debug, info, warn, error
 
+  // Detect cloud environment (Render, Heroku, etc.) - skip file logging on ephemeral filesystems
+  ENABLE_FILE_LOGGING: !process.env.RENDER && !process.env.DYNO,
+
   // API settings
   API_ENDPOINT: 'https://kuchababok.online/en/links/api/add-link/',
   
-  // NEW: API Server settings
-  API_PORT: parseInt(process.env.STEAM_PROCESSOR_API_PORT) || 3002,
+  // NEW: API Server settings (PORT is set by Render, STEAM_PROCESSOR_API_PORT for local dev)
+  API_PORT: parseInt(process.env.PORT) || parseInt(process.env.STEAM_PROCESSOR_API_PORT) || 3002,
   API_HOST: process.env.STEAM_PROCESSOR_API_HOST || '0.0.0.0',
   
   // Processing settings
@@ -99,6 +102,7 @@ for (const [varName, value] of Object.entries(requiredEnvVars)) {
 console.log('📝 Logging configuration:');
 console.log(`   Log directory: ${CONFIG.LOG_DIR}`);
 console.log(`   Log level: ${CONFIG.LOG_LEVEL} (set via LOG_LEVEL env var)`);
+console.log(`   File logging: ${CONFIG.ENABLE_FILE_LOGGING ? 'enabled' : 'disabled (cloud environment detected)'}`);
 
 // Log API server configuration
 console.log('🌐 API Server configuration:');
@@ -125,7 +129,9 @@ if (!fs.existsSync(parentDir)) {
   console.error(`Parent directory not found: ${parentDir}`);
 }
 
-// Ensure log directory exists
-fs.ensureDirSync(CONFIG.LOG_DIR);
+// Ensure log directory exists (only if file logging is enabled)
+if (CONFIG.ENABLE_FILE_LOGGING) {
+  fs.ensureDirSync(CONFIG.LOG_DIR);
+}
 
 module.exports = CONFIG;

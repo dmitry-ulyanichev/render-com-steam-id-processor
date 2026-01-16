@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const CONFIG = require('../../config/config');
 
-// Ensure logs directory exists
-fs.mkdirSync(CONFIG.LOG_DIR, { recursive: true });
+// Ensure logs directory exists (only if file logging is enabled)
+if (CONFIG.ENABLE_FILE_LOGGING) {
+  fs.mkdirSync(CONFIG.LOG_DIR, { recursive: true });
+}
 
 // Log file paths
 const MAIN_LOG = path.resolve(CONFIG.LOG_DIR, 'steam_id_processor.log');
@@ -46,12 +48,14 @@ class SimpleLogger {
     // Always write to console
     console.log(logMessage.trim());
 
-    // Write to file (synchronous to prevent race conditions)
-    try {
-      fs.appendFileSync(logFile, logMessage, 'utf8');
-    } catch (error) {
-      // If file write fails, at least log to console
-      console.error(`Failed to write to log file: ${error.message}`);
+    // Write to file (synchronous to prevent race conditions) - skip on cloud environments
+    if (CONFIG.ENABLE_FILE_LOGGING) {
+      try {
+        fs.appendFileSync(logFile, logMessage, 'utf8');
+      } catch (error) {
+        // If file write fails, at least log to console
+        console.error(`Failed to write to log file: ${error.message}`);
+      }
     }
   }
 
@@ -61,8 +65,8 @@ class SimpleLogger {
 
   error(message) {
     this._write('error', message, MAIN_LOG);
-    // Also write errors to error.log
-    if (this._shouldLog('error')) {
+    // Also write errors to error.log (skip on cloud environments)
+    if (CONFIG.ENABLE_FILE_LOGGING && this._shouldLog('error')) {
       try {
         const timestamp = new Date().toISOString();
         const logMessage = `[${timestamp}] ERROR: ${message}\n`;
