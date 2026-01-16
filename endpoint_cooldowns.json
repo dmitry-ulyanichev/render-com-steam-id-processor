@@ -1,0 +1,10 @@
+{
+  "connections": [
+    {
+      "index": 0,
+      "type": "direct",
+      "url": null,
+      "endpoint_cooldowns": {}
+    }
+  ]
+}
