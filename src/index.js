@@ -281,13 +281,26 @@ async function main() {
   const apiService = new ApiService(CONFIG);
 
   // Initialize Redis Queue Client (for pulling from shared validator queue)
-  const instanceId = `steam-id-processor-${crypto.randomBytes(4).toString('hex')}`;
+  const instanceId = process.env.STEAM_ID_PROCESSOR_INSTANCE_ID
+    || `steam-id-processor-${crypto.randomBytes(4).toString('hex')}`;
   redisQueueClient = new RedisQueueClient({
     queueApiUrl: process.env.NODE_API_SERVICE_URL || 'http://127.0.0.1:3001',
     apiKey: CONFIG.LINK_HARVESTER_API_KEY,
     instanceId: instanceId
   });
   logger.info(`Initialized Redis Queue Client - Instance ID: ${instanceId}`);
+
+  // Cleanup orphaned claims from previous run (in case of restart with same instance ID)
+  try {
+    const releasedCount = await redisQueueClient.releaseInstance();
+    if (releasedCount > 0) {
+      logger.info(`Released ${releasedCount} orphaned items from previous run`);
+    } else {
+      logger.info('No orphaned claims found from previous run');
+    }
+  } catch (error) {
+    logger.warn(`Could not clean up orphaned claims: ${error.message} - continuing anyway`);
+  }
 
   // Initialize QueueManager with Redis client AND steamValidator for health checks
   queueManager = new QueueManager(CONFIG, redisQueueClient, steamValidator);

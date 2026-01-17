@@ -153,6 +153,23 @@ class RedisQueueClient {
             return null;
         }
     }
+
+    /**
+     * Release all items claimed by this instance (cleanup orphaned claims on startup)
+     * @returns {number} Number of items released
+     */
+    async releaseInstance() {
+        try {
+            const response = await this.makeRequest('POST', `/queue/${this.queueName}/release-instance`, {
+                instance_id: this.instanceId
+            });
+
+            return response.released_count || 0;
+        } catch (error) {
+            logger.error(`Error releasing instance claims: ${error.message}`);
+            return 0;
+        }
+    }
 }
 
 module.exports = RedisQueueClient;
