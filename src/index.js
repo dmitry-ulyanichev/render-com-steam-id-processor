@@ -10,6 +10,7 @@ const crypto = require('crypto');
 
 // Global state variables
 let isProcessing = false;
+let isProcessingDeferred = false;
 let apiServer = null; // NUEVO
 let queueManager = null; // For cleanup on shutdown
 let redisQueueClient = null; // For cleanup on shutdown
@@ -25,12 +26,21 @@ async function processQueuedProfiles(steamValidator, apiService, queueManager) {
   
   try {
     // Process deferred checks first if connections are available
-    logger.debug(`🔍 [DEBUG] Processing deferred checks...`);
-    const deferredResult = await steamValidator.processDeferredChecks(queueManager);
-    if (deferredResult.processed > 0) {
-      logger.info(`Processed ${deferredResult.processed} deferred checks, ${deferredResult.remaining} remaining`);
+    if (!isProcessingDeferred) {
+      isProcessingDeferred = true;
+      logger.debug(`🔍 [DEBUG] Processing deferred checks...`);
+      try {
+        const deferredResult = await steamValidator.processDeferredChecks(queueManager);
+        if (deferredResult.processed > 0) {
+          logger.info(`Processed ${deferredResult.processed} deferred checks, ${deferredResult.remaining} remaining`);
+        } else {
+          logger.debug(`🔍 [DEBUG] No deferred checks were processed (processed: ${deferredResult.processed}, remaining: ${deferredResult.remaining})`);
+        }
+      } finally {
+        isProcessingDeferred = false;
+      }
     } else {
-      logger.debug(`🔍 [DEBUG] No deferred checks were processed (processed: ${deferredResult.processed}, remaining: ${deferredResult.remaining})`);
+      logger.debug(`🔍 [DEBUG] Deferred check processing already in progress, skipping`);
     }
     
     // Find next processable profile from queue
@@ -372,17 +382,26 @@ async function main() {
       
       // Process any deferred checks where connections are now available
       const deferredChecks = Array.from(steamValidator.getDeferredChecks().entries());
-      
+
       logger.debug(`🔍 [DEBUG] steamValidator.getDeferredChecks() size: ${steamValidator.getDeferredChecks().size}`);
       logger.debug(`🔍 [DEBUG] deferredChecks entries: ${deferredChecks.length}`);
-      
+
       if (deferredChecks.length > 0) {
-        logger.info(`🔄 Processing ${deferredChecks.length} deferred checks...`);
-        const deferredResult = await steamValidator.processDeferredChecks(queueManager);
-        if (deferredResult.processed > 0) {
-          logger.info(`✅ Processed ${deferredResult.processed} deferred checks, ${deferredResult.remaining} remaining`);
+        if (!isProcessingDeferred) {
+          isProcessingDeferred = true;
+          logger.info(`🔄 Processing ${deferredChecks.length} deferred checks...`);
+          try {
+            const deferredResult = await steamValidator.processDeferredChecks(queueManager);
+            if (deferredResult.processed > 0) {
+              logger.info(`✅ Processed ${deferredResult.processed} deferred checks, ${deferredResult.remaining} remaining`);
+            } else {
+              logger.debug(`No deferred checks were processed`);
+            }
+          } finally {
+            isProcessingDeferred = false;
+          }
         } else {
-          logger.debug(`No deferred checks were processed`);
+          logger.debug(`Deferred check processing already in progress, skipping`);
         }
       } else {
         logger.debug(`🔍 [DEBUG] No deferred checks in steamValidator.deferredChecks Map`);
