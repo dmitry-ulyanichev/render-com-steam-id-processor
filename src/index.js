@@ -392,7 +392,18 @@ async function main() {
           }
         });
       }
-      
+
+      // Reload orphaned deferred checks when all endpoints available
+      if (availableEndpoints === totalEndpoints &&
+          deferredStats.totalDeferred > 0 &&
+          steamValidator.getDeferredChecks().size === 0) {
+        logger.info(`🔄 Reloading ${deferredStats.totalDeferred} orphaned deferred checks from queue file`);
+        const orphanedChecks = await queueManager.getDeferredChecksFromQueue();
+        for (const { steamId, checkType } of orphanedChecks) {
+          steamValidator.addToDeferredChecks(steamId, checkType);
+        }
+      }
+
       // Process any deferred checks where connections are now available
       const deferredChecks = Array.from(steamValidator.getDeferredChecks().entries());
 

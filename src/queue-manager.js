@@ -454,6 +454,20 @@ class QueueManager {
     };
   }
 
+  async getDeferredChecksFromQueue() {
+    const profiles = await this.getQueuedProfiles();
+    const deferredChecks = [];
+
+    for (const profile of profiles) {
+      for (const [checkType, status] of Object.entries(profile.checks)) {
+        if (status === "deferred") {
+          deferredChecks.push({ steamId: profile.steam_id, checkType });
+        }
+      }
+    }
+    return deferredChecks;
+  }
+
   async getAllChecksComplete(steamId) {
     const profiles = await this.getQueuedProfiles();
     const profile = profiles.find(p => p.steam_id === steamId);
