@@ -11,9 +11,14 @@ class ApiServer {
     this.app = express();
     this.server = null;
     this.queueManager = null;
+    this.inventoryMonitor = null;
     this.port = CONFIG.API_PORT || 3002;
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  setInventoryMonitor(monitor) {
+    this.inventoryMonitor = monitor;
   }
 
   setupMiddleware() {
@@ -90,6 +95,18 @@ class ApiServer {
           timestamp: new Date().toISOString()
         });
       }
+    });
+
+    // Inventory request stats endpoint
+    this.app.get('/health/inventory-stats', (req, res) => {
+      if (!this.inventoryMonitor) {
+        return res.status(503).json({ error: 'Inventory monitor not initialized' });
+      }
+      res.json({
+        status: 'ok',
+        ...this.inventoryMonitor.getStats(),
+        timestamp: new Date().toISOString()
+      });
     });
 
     // Add profiles to queue
@@ -187,7 +204,8 @@ class ApiServer {
         error: 'Endpoint not found',
         available_endpoints: [
           'GET /health',
-          'GET /health/cooldowns', 
+          'GET /health/cooldowns',
+          'GET /health/inventory-stats',
           'POST /profiles',
           'GET /profiles/queue'
         ],
@@ -322,6 +340,7 @@ class ApiServer {
         logger.info(`📡 Available endpoints:`);
         logger.info(`   GET  http://localhost:${this.port}/health`);
         logger.info(`   GET  http://localhost:${this.port}/health/cooldowns`);
+        logger.info(`   GET  http://localhost:${this.port}/health/inventory-stats`);
         logger.info(`   POST http://localhost:${this.port}/profiles`);
         logger.info(`   GET  http://localhost:${this.port}/profiles/queue`);
         resolve();

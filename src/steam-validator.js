@@ -8,8 +8,9 @@ const CooldownManager = require('./cooldown-manager');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 class SteamValidator {
-  constructor(config) {
+  constructor(config, inventoryMonitor) {
     this.config = config;
+    this.inventoryMonitor = inventoryMonitor || null;
     this.apiKey = null;
     this.lastApiCallTime = 0;
     this.minApiCallInterval = 1000; // 1 second between calls
@@ -161,6 +162,11 @@ class SteamValidator {
 
       const response = await axiosInstance.get(url);
 
+      // Record inventory request for monitoring
+      if (endpointName === 'inventory' && this.inventoryMonitor) {
+        this.inventoryMonitor.recordRequest(response.status);
+      }
+
       logger.debug(`🔍 [DEBUG] HTTP request successful for ${endpointName}, status: ${response.status}`);
 
       // Reset backoff on successful request
@@ -173,7 +179,12 @@ class SteamValidator {
     } catch (error) {
       const errorStatus = error.response ? error.response.status : 'no status';
       const errorMessage = error.message || 'Unknown error';
-      
+
+      // Record inventory request for monitoring (error case)
+      if (endpointName === 'inventory' && this.inventoryMonitor) {
+        this.inventoryMonitor.recordRequest(error.response ? error.response.status : 'error');
+      }
+
     if (!(errorStatus === 403 && endpointName === 'inventory')) {
       logger.debug(`🔍 [DEBUG] HTTP request failed for ${endpointName}`);
     }

@@ -4,6 +4,7 @@ const SteamValidator = require('./steam-validator');
 const ApiService = require('./api-service');
 const QueueManager = require('./queue-manager');
 const ApiServer = require('./api-server');
+const InventoryMonitor = require('./inventory-monitor');
 const RedisQueueClient = require('./redis-queue-client');
 const logger = require('./utils/logger');
 const crypto = require('crypto');
@@ -275,9 +276,13 @@ async function main() {
     process.exit(1);
   }
   
+  // Initialize inventory monitor
+  const inventoryMonitor = new InventoryMonitor();
+  apiServer.setInventoryMonitor(inventoryMonitor);
+
   // Initialize components
   logger.debug(`🔍 [DEBUG] About to initialize SteamValidator with CONFIG`);
-  const steamValidator = new SteamValidator(CONFIG);
+  const steamValidator = new SteamValidator(CONFIG, inventoryMonitor);
   const apiService = new ApiService(CONFIG);
 
   // Initialize Redis Queue Client (for pulling from shared validator queue)
@@ -363,6 +368,7 @@ async function main() {
 
       // Log current status
       logger.info(`🔌 Endpoint status: ${connectionStatus}`);
+      logger.info(`📦 Inventory requests (24h rolling): ${inventoryMonitor.getRolling24hCount()}`);
       logger.info(`📋 Queue status: ${queueStats.totalProfiles} profiles total`);
       
       if (queueStats.totalProfiles > 0) {
