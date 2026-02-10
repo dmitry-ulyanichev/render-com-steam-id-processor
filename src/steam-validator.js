@@ -180,9 +180,12 @@ class SteamValidator {
       const errorStatus = error.response ? error.response.status : 'no status';
       const errorMessage = error.message || 'Unknown error';
 
-      // Record inventory request for monitoring (error case)
+      // Record inventory request for monitoring (error case, skip 429s)
       if (endpointName === 'inventory' && this.inventoryMonitor) {
-        this.inventoryMonitor.recordRequest(error.response ? error.response.status : 'error');
+        const status = error.response ? error.response.status : 'error';
+        if (status !== 429) {
+          this.inventoryMonitor.recordRequest(status);
+        }
       }
 
     if (!(errorStatus === 403 && endpointName === 'inventory')) {
