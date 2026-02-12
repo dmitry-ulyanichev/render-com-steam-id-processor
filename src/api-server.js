@@ -21,6 +21,10 @@ class ApiServer {
     this.inventoryMonitor = monitor;
   }
 
+  setSteamValidator(validator) {
+    this.steamValidator = validator;
+  }
+
   setupMiddleware() {
     // Trust proxy headers
     this.app.set('trust proxy', true);
@@ -76,13 +80,20 @@ class ApiServer {
     this.app.get('/health/cooldowns', async (req, res) => {
       try {
         const cooldownData = await this.getCooldownStatus();
-        
+
+        // Add inventory connection pool status if available
+        let inventoryConnections = null;
+        if (this.steamValidator && this.steamValidator.connectionManager) {
+          inventoryConnections = this.steamValidator.connectionManager.getStatus();
+        }
+
         res.json({
           status: 'ok',
           service: 'steam-id-processor',
           cooldowns: cooldownData.cooldowns,
           summary: cooldownData.summary,
           overall_status: cooldownData.overallStatus,
+          inventory_connections: inventoryConnections,
           timestamp: new Date().toISOString()
         });
         

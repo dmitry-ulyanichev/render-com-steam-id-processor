@@ -3,6 +3,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const logger = require('./utils/logger');
 const CooldownManager = require('./cooldown-manager');
+const ConnectionManager = require('./connection-manager');
 
 // Load environment variables
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
@@ -40,7 +41,10 @@ class SteamValidator {
     );
 
     logger.debug(`🔍 [DEBUG] CooldownManager initialized`);
-    
+
+    // Initialize connection manager for inventory proxy pool
+    this.connectionManager = new ConnectionManager(this.cooldownManager);
+
     // Add a property to track deferred checks
     this.deferredChecks = new Map();
   
@@ -260,22 +264,26 @@ class SteamValidator {
   }
 
   async retryWithNextConnection(url, endpointName) {
-    // Check if we have another connection available for this endpoint
+    if (endpointName === 'inventory') {
+      // Inventory retries are handled inside connectionManager.makeInventoryRequest
+      // If we got here, all connections were already tried
+      const nextAvailableIn = this.connectionManager.getNextAvailableTime();
+      const waitTimeMin = Math.ceil(nextAvailableIn / 60000);
+      logger.warn(`❌ All inventory connections in cooldown, deferring request (~${waitTimeMin} minutes)`);
+      return { allInCooldown: true, nextAvailableIn, endpointName };
+    }
+
+    // Non-inventory endpoints use original logic
     if (!this.cooldownManager.areAllConnectionsInCooldownForEndpoint(endpointName)) {
       logger.info(`🔄 Retrying ${endpointName} with next available connection...`);
       return this.makeApiRequest(url);
     }
-    
-    // All connections in cooldown for this endpoint
+
     const nextAvailableIn = this.cooldownManager.getNextAvailableTimeForEndpoint(endpointName);
     const waitTimeMin = Math.ceil(nextAvailableIn / 60000);
-    
+
     logger.warn(`❌ All connections in cooldown for ${endpointName}, deferring request (~${waitTimeMin} minutes)`);
-    return {
-      allInCooldown: true,
-      nextAvailableIn: nextAvailableIn,
-      endpointName: endpointName
-    };
+    return { allInCooldown: true, nextAvailableIn, endpointName };
   }
 
   async checkAnimatedAvatar(steamId) {
@@ -583,10 +591,32 @@ class SteamValidator {
     }
   }
 
+  async makeInventoryRequest(url) {
+    await this.respectRateLimit();
+
+    const result = await this.connectionManager.makeInventoryRequest(url);
+
+    // Record for inventory monitoring (skip 429s / allInCooldown)
+    if (this.inventoryMonitor && !result.allInCooldown) {
+      if (result.success) {
+        this.inventoryMonitor.recordRequest(200);
+      } else if (result.isPrivateInventory) {
+        this.inventoryMonitor.recordRequest(403);
+      } else if (result.errorObj && result.errorObj.response) {
+        const status = result.errorObj.response.status;
+        if (status !== 429) {
+          this.inventoryMonitor.recordRequest(status);
+        }
+      }
+    }
+
+    return result;
+  }
+
   async checkCsgoInventory(steamId) {
     try {
       const url = `https://steamcommunity.com/inventory/${steamId}/730/2`;
-      const result = await this.makeApiRequest(url);
+      const result = await this.makeInventoryRequest(url);
       
       // Check if all connections are in cooldown
       if (result.allInCooldown) {
@@ -738,7 +768,9 @@ class SteamValidator {
         logger.debug(`🔍 [DEBUG] processDeferredChecks: ${checkType} maps to endpoint ${endpointName}`);
         
         // Check if connections are available for this specific endpoint BEFORE trying
-        const allInCooldown = this.cooldownManager.areAllConnectionsInCooldownForEndpoint(endpointName);
+        const allInCooldown = endpointName === 'inventory'
+          ? this.connectionManager.areAllInCooldown()
+          : this.cooldownManager.areAllConnectionsInCooldownForEndpoint(endpointName);
         logger.debug(`🔍 [DEBUG] processDeferredChecks: All connections in cooldown for ${endpointName}: ${allInCooldown}`);
         
         if (allInCooldown) {
@@ -856,7 +888,9 @@ class SteamValidator {
 
   // Get the proxy manager status
   getCooldownStatus() {
-    return this.cooldownManager.getConnectionStatus();
+    const status = this.cooldownManager.getConnectionStatus();
+    status.inventoryConnections = this.connectionManager.getStatus();
+    return status;
   }
   
   async testProxyConnection() {

@@ -283,6 +283,7 @@ async function main() {
   // Initialize components
   logger.debug(`🔍 [DEBUG] About to initialize SteamValidator with CONFIG`);
   const steamValidator = new SteamValidator(CONFIG, inventoryMonitor);
+  apiServer.setSteamValidator(steamValidator);
   const apiService = new ApiService(CONFIG);
 
   // Initialize Redis Queue Client (for pulling from shared validator queue)
@@ -386,7 +387,7 @@ async function main() {
       const endpointSummary = status.endpointSummary;
       const endpointsWithCooldowns = Object.entries(endpointSummary)
         .filter(([_, summary]) => summary.availableConnections < summary.totalConnections);
-      
+
       if (endpointsWithCooldowns.length > 0) {
         logger.info(`🚫 Endpoint cooldowns:`);
         endpointsWithCooldowns.forEach(([endpoint, summary]) => {
@@ -397,6 +398,17 @@ async function main() {
             logger.info(`    ${endpoint}: ${summary.availableConnections}/${summary.totalConnections} connections available`);
           }
         });
+      }
+
+      // Log per-connection inventory status from ConnectionManager
+      if (status.inventoryConnections) {
+        const invStatus = status.inventoryConnections;
+        logger.info(`🔌 Inventory connections: ${invStatus.availableConnections}/${invStatus.totalConnections} available`);
+        for (const conn of invStatus.connections) {
+          if (!conn.available) {
+            logger.info(`    ${conn.id} (${conn.type}): cooldown ~${conn.cooldownRemainingMin}m [${conn.reason}]`);
+          }
+        }
       }
 
       // Reload orphaned deferred checks when all endpoints available
