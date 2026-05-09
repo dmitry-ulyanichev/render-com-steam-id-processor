@@ -10,6 +10,7 @@ class ApiService {
   constructor(config) {
     this.config = config;
     this.apiEndpoint = config.API_ENDPOINT;
+    this.apiBaseUrl = (config.API_BASE_URL || 'https://kuchababok.site').replace(/\/$/, '');
     this.credentials = null;
     this.loadCredentials();
   }
@@ -22,7 +23,7 @@ class ApiService {
     
     if (!this.credentials.apiKey) {
       logger.warn('LINK_HARVESTER_API_KEY not found in environment variables');
-      logger.warn('API calls to kuchababok.com will fail without this key');
+      logger.warn(`API calls to ${this.apiBaseUrl} will fail without this key`);
     } else {
       logger.info('API credentials loaded successfully from environment');
     }
@@ -32,7 +33,7 @@ class ApiService {
     try {
       logger.info(`Checking if Steam ID ${steamId} exists in database`);
       
-      const url = `https://kuchababok.online/ru/links/api/check-id-exists/${steamId}/`;
+      const url = `${this.apiBaseUrl}/ru/links/api/check-id-exists/${steamId}/`;
       const response = await axios.get(url, {
         timeout: 5000
       });
@@ -77,7 +78,7 @@ class ApiService {
     }
 
     try {
-      logger.info(`Sending Steam ID ${steamId} to kuchababok.com API (user: ${username})`);
+      logger.info(`Sending Steam ID ${steamId} to ${this.apiBaseUrl} API (user: ${username})`);
       
       // Prepare request parameters - use username from parameter (from queue)
       const params = {
@@ -94,7 +95,7 @@ class ApiService {
       
       // Process response
       if (response.status === 200) {
-        logger.info(`Successfully added Steam ID ${steamId} to kuchababok.com (user: ${username})`);
+        logger.info(`Successfully added Steam ID ${steamId} to ${this.apiBaseUrl} (user: ${username})`);
         return {
           success: true,
           data: response.data
@@ -165,7 +166,7 @@ class ApiService {
       if (apiResponse.success) {
         // Successful API call
         result.success = true;
-        logger.info(`Successfully added Steam ID ${steamId} (user: ${username}) to kuchababok.com`);
+        logger.info(`Successfully added Steam ID ${steamId} (user: ${username}) to ${this.apiBaseUrl}`);
         return result;
       }
       
@@ -175,7 +176,7 @@ class ApiService {
       
       if (errorMessage.includes('Link already exists')) {
         // Link already exists - consider this a success
-        logger.info(`Steam ID ${steamId} (user: ${username}) already exists on kuchababok.com`);
+        logger.info(`Steam ID ${steamId} (user: ${username}) already exists on ${this.apiBaseUrl}`);
         result.success = true;
         return result;
       } else if (errorMessage.includes('Invalid Steam ID format')) {
