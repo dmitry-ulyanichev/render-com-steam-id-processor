@@ -290,7 +290,7 @@ async function main() {
   const instanceId = process.env.STEAM_ID_PROCESSOR_INSTANCE_ID
     || `steam-id-processor-${crypto.randomBytes(4).toString('hex')}`;
   redisQueueClient = new RedisQueueClient({
-    queueApiUrl: process.env.NODE_API_SERVICE_URL || 'http://127.0.0.1:3001',
+    queueApiUrl: CONFIG.NODE_API_SERVICE_URL,
     apiKey: CONFIG.LINK_HARVESTER_API_KEY,
     instanceId: instanceId
   });

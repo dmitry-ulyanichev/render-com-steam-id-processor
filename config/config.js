@@ -11,6 +11,7 @@ console.log('🔍 [DEBUG] BACKOFF_SEQUENCE_MINUTES env var:', process.env.BACKOF
 // Determine the parent directory (project root)
 const parentDir = path.resolve(__dirname, '../..');
 const apiBaseUrl = (process.env.API_BASE_URL || 'https://kuchababok.site').replace(/\/$/, '');
+const queueApiUrl = (process.env.NODE_API_SERVICE_URL || `${apiBaseUrl}/api/node`).replace(/\/$/, '');
 
 // Helper function to parse duration with fallback
 function parseDuration(envVar, defaultValue) {
@@ -51,6 +52,7 @@ const CONFIG = {
   // API settings
   API_BASE_URL: apiBaseUrl,
   API_ENDPOINT: process.env.API_ENDPOINT || `${apiBaseUrl}/en/links/api/add-link/`,
+  NODE_API_SERVICE_URL: queueApiUrl,
   
   // NEW: API Server settings (PORT is set by Render, STEAM_PROCESSOR_API_PORT for local dev)
   API_PORT: parseInt(process.env.PORT) || parseInt(process.env.STEAM_PROCESSOR_API_PORT) || 3002,
@@ -113,6 +115,7 @@ console.log(`   Port: ${CONFIG.API_PORT}`);
 console.log(`   Environment override: STEAM_PROCESSOR_API_PORT`);
 console.log(`   Link API base URL: ${CONFIG.API_BASE_URL}`);
 console.log(`   Link API endpoint: ${CONFIG.API_ENDPOINT}`);
+console.log(`   Queue API URL: ${CONFIG.NODE_API_SERVICE_URL}`);
 
 // Log backoff sequence configuration
 console.log('🔄 Exponential backoff sequence for 429 errors:');

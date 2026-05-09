@@ -9,7 +9,8 @@ const logger = require('./utils/logger');
  */
 class RedisQueueClient {
     constructor(config) {
-        this.queueApiUrl = config.queueApiUrl || process.env.NODE_API_SERVICE_URL || 'http://127.0.0.1:3001';
+        const apiBaseUrl = (process.env.API_BASE_URL || 'https://kuchababok.site').replace(/\/$/, '');
+        this.queueApiUrl = (config.queueApiUrl || process.env.NODE_API_SERVICE_URL || `${apiBaseUrl}/api/node`).replace(/\/$/, '');
         this.apiKey = config.apiKey || process.env.LINK_HARVESTER_API_KEY || 'fa46kPOVnHT2a4aFmQS11dd70290';
         this.queueName = 'validator';
         this.instanceId = config.instanceId; // Unique ID for this instance
@@ -23,7 +24,7 @@ class RedisQueueClient {
      */
     async makeRequest(method, endpoint, data = null) {
         return new Promise((resolve, reject) => {
-            const fullUrl = `${this.queueApiUrl}${endpoint}`;
+            const fullUrl = `${this.queueApiUrl}/${endpoint.replace(/^\/+/, '')}`;
             const urlObj = new URL(fullUrl);
             const isHttps = urlObj.protocol === 'https:';
             const httpModule = isHttps ? https : http;
@@ -31,7 +32,7 @@ class RedisQueueClient {
             const options = {
                 hostname: urlObj.hostname,
                 port: urlObj.port || (isHttps ? 443 : 80),
-                path: urlObj.pathname,
+                path: `${urlObj.pathname}${urlObj.search}`,
                 method: method,
                 headers: {
                     'Content-Type': 'application/json',
@@ -67,7 +68,8 @@ class RedisQueueClient {
             });
 
             req.on('error', (err) => {
-                reject(new Error(`Queue API request failed: ${err.message}`));
+                const code = err.code ? ` (${err.code})` : '';
+                reject(new Error(`Queue API request failed for ${method} ${fullUrl}: ${err.message}${code}`));
             });
 
             req.on('timeout', () => {
