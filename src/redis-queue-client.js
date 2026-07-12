@@ -35,7 +35,7 @@ class RedisQueueClient {
                 path: `${urlObj.pathname}${urlObj.search}`,
                 method: method,
                 headers: {
-                    'Content-Type': 'application/json',
+                    // 'Content-Type': 'application/json',
                     'X-API-Key': this.apiKey
                 },
                 timeout: 30000
