@@ -615,7 +615,7 @@ class SteamValidator {
 
   async checkCsgoInventory(steamId) {
     try {
-      const url = `https://steamcommunity.com/inventory/${steamId}/730/2`;
+      const url = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english`;
       const result = await this.makeInventoryRequest(url);
       
       // Check if all connections are in cooldown
